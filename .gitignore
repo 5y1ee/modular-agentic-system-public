@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+.pytest_cache/
+dist/
+logs/
+# 조사에 쓰는 사용자 자료(공고 캡처·PDF 등 개인 자료가 들어 있다)
+inputs/
+# qmd 프록시 설정(API 키의 해시가 들어 있다)
+proxy.json
+proxy.*.json
+*.egg-info/
+# Tailscale 시험용 배포 생성물과 상태
+deploy/tailscale_probe/build/
+deploy/tailscale_probe/deployment_package.zip
+deploy/tailscale_probe/.probe-state.json

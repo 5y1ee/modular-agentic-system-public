@@ -1,0 +1,80 @@
+# 자소서 한 건 돌리는 순서 (실행 가이드와 진행 기록)
+
+작성 2026-10-10. 공고 하나를 받아 초안까지 가는 순서와 각 단계의 명령, 그리고 지금 진행 중인 건(현대오토에버 2026 4분기 신입)의 기록이다. 설계의 이유는 `design-research-stage.md`, 실측은 `experiments/003`에 있다. 이 문서는 "무엇을 어떤 순서로 하나"만 적는다.
+
+모든 AWS(Bedrock) 호출은 `AWS_PROFILE=user`이 필요하고 비용이 든다. 명령은 레포 루트에서 실행한다. 사람이 판단하는 자리는 **[사용자]**로 표시했다.
+
+## A. 순서
+
+| # | 단계 | 명령·행동 | 시간·비용 |
+|---|---|---|---|
+| 0 | 준비 | Tavily 키 파일(`~/.config/mas/tavily_key`, 권한 600), vault 최신 상태, 서버에서 qmd 설치 | 한 번만 |
+| 1 | 공고를 텍스트로 | 텍스트 공고는 파일로 저장. **이미지 공고**(대기업 공채)는 `scripts/transcribe_file.py 이미지 -o 공고.txt`로 전사(긴 이미지는 조각 전사) 후 **[사용자] 원본과 대조해 고친다** | Bedrock 조각마다 1회 |
+| 2 | 직무 선택 **[사용자]** | 지원할 직무와 그 직무 상세(JD)를 공고 텍스트 뒤에 "지원 직군 상세" 섹션으로 붙인다(임시 방식, 출처 표기가 "공고"로 나오는 한계가 있다) | — |
+| 3 | 회사 조사 | `scripts/research_brief.py run 공고.txt --company 회사명 [--url …] [--query 직무 맞춤 검색어] [--inputs 폴더]` → 검색+읽기+주장 뽑기 → `logs/01_research/<공고>.md`(미승인) | Bedrock 1회 + Tavily 약 4~6 크레딧 |
+| 3a | 자료 보태기 | 뒤늦게 얻은 문서는 폴더에 넣고 `research_brief.py reresearch <공고> --add 파일·폴더 --replace`(새로 검색하지 않고 조사 모델만 다시, 원본은 `_prev`로 백업) | Bedrock 1회 |
+| 4 | 보고서 확인 **[사용자]** | `show` → 틀린 주장은 `drop <공고> c3 …` → 괜찮으면 `approve <공고>`. **승인한 것만 작성이 쓴다** | — |
+| 4a | 분석(요구 목록) | `scripts/analyze_posting.py run 공고.txt`(이미 앞 단계를 돌렸으면 모델 없이 `from-state 공고id`) → `logs/02_analyze/<공고>.md`를 읽고 **[사용자]** `mark 공고id --basic 1,2,9,…`로 기본 요건(어필·검증 안 할 요구)을 표시. 승인된 조사 보고서가 있으면 `context 공고id`로 요구마다 회사 맥락(관련 조사 주장)을 붙임(선택, 억지 연결은 무시). 설계 문서 25절 | `run` Bedrock 1회, `context` 1회 |
+| 5 | 앞 단계(매핑·검증, 분석 결과가 있으면 그 요구 목록으로) | `AWS_PROFILE=user scripts/with_qmd_server.sh uv run --extra strands --extra sources python scripts/run_writer_demo.py 공고.txt --state-only` → `logs/03_map/<공고>.json`. qmd 서버를 실행하는 동안만 켠다 | 약 4분, Bedrock 요구 수 × 여러 회 |
+| 6 | (가치 문항이면) 가치 매핑 | `scripts/map_values.py 가치파일.md --id <공고>`(qmd 서버 필요) → `logs/03_map/<공고>_values.md`에 가치별 근거 후보 → **[사용자]** 쓸 가치를 고른다 | 약 2분 |
+| 7 | 소재 계획 | `scripts/make_plan.py make 공고.txt --questions 문항파일 --variant "가치 이름" [--basic 1,2,9,10,11,13]`(--basic을 안 주면 4a에서 `mark`한 기본 요건을 쓴다. 회사 맥락은 `--with-context`를 줄 때만 입력에 넣는다) → `logs/04_plan/<공고>__<이름>.md`(요구 대응표 + 문항별 중심 경험·근거·회사 사실·쓰지 않을 소재). **[사용자]** `show` → 고치려면 `--note`로 다시 → `approve`. **[사용자]** 승인한 소재 계획만 작성이 쓴다. vault에 없는 사용자만 아는 사실은 `inputs/user_facts.md`(`## 소제목` 하나가 근거 하나)에 적고 `--user-facts`로 준다(vault와 대조하지 않는다) | Bedrock 1회 |
+| 8 | 문항별 작성 | **소재 계획으로**: `scripts/run_writer_demo.py 공고.txt --plan "소재 계획 이름" --number N [--user-facts 파일] [--n 3] [--guidance "바로잡을 지시"]` → `logs/05_write/<시각>-<공고>.md`(읽는 용). 소재 계획 없이: `--question "문항 (N자)" [--focus 요구번호들]`. 이어서 피드백 루프 `scripts/feedback_loop.py 공고.txt --question "…"` | 문항마다 Bedrock 1~수 회 |
+| 8-1 | 문장 검증(초안·고친 글) | `scripts/check_draft.py 공고.txt --draft logs/05_write/<초안>.json --number N [--text 고친글.txt] [--user-facts 파일]` → 문장마다 쓴 근거가 뒷받침하는지 판정(⚠는 사람이 근거 원문과 대조). 초안이 쓴 근거만 본다(설계 문서 24절). **[사용자]** ⚠ 문장을 근거 원문과 보고 고친다 | Bedrock 1회 |
+| 9 | vault를 고쳤으면 | **[사용자]** vault 편집 → `qmd update && qmd embed`(서버 CPU를 다 쓴다) → 5번을 `--refresh`로 다시 | 약 4분 |
+
+초안은 `logs/05_write/`에 남고, 초안에 쓴 근거(vault 위치)·쓴 회사 사실(주장 id)·경고가 같이 나온다. 초안은 시작점이고 최종 문장은 사용자가 고친다(vault의 "초안 vs 직접 수정" 원칙).
+
+## B. 파일은 어디에 생기나 (모두 git에 올리지 않는다)
+
+폴더 이름은 단계의 역할 순서다(2026-10-11 변경): `00_collect`(수집) → `01_research`(조사) → `02_analyze`(분석) → `03_map`(매핑·검증) → `04_plan`(소재 계획) → `05_write`(작성). 경로는 `scripts/common.py` 한곳에 있다. `02_analyze`에는 분석 결과(요구 목록, 기본 요건 표시, 요구별 회사 맥락)가 따로 저장된다(2026-10-11).
+옛 이름 → 새 이름: `inputs/postings`·`inputs/<공고>/` → `inputs/00_collect/`, `logs/briefs` → `logs/01_research`, `logs/state` → `logs/03_map`, `logs/plans` → `logs/04_plan`, `logs/drafts`·`logs/feedback` → `logs/05_write`·`logs/05_write/feedback`. 실험 기록(`docs/experiments/`)과 옛 daily에는 옛 이름이 그대로 있다.
+
+| 위치 | 내용 |
+|---|---|
+| `inputs/00_collect/<공고>.txt` | 공고 텍스트(전사본 포함). `_원본_…/` 폴더에 원본 이미지와 틀렸던 첫 전사 보관 |
+| `inputs/00_collect/<공고>/` | 사용자가 준 회사 자료(파일). 이 폴더의 파일이 조사에 같이 들어간다 |
+| `inputs/user_facts.md` | 사용자가 직접 말한 사실(vault와 대조하지 않음). 소재 계획·작성이 `--user-facts`로 읽는다. 조사에 섞이지 않게 `inputs/00_collect/<공고>/` 밖에 둔다 |
+| `logs/01_research/<공고>.json·.md` | 조사 보고서(JSON이 원본, md는 읽는 용, `approved` 표시) |
+| `logs/04_plan/<공고>__<이름>.json·.md` | 소재 계획(승인 여부 포함) |
+| `logs/02_analyze/<공고>.json·.md` | 분석 결과: 요구 목록, 사용자가 표시한 기본 요건, 요구별 회사 맥락(참고, 내 근거 아님) |
+| `logs/03_map/<공고>.json` | 앞 단계(분석·매핑·검증) 결과. `<공고>_values.json`은 가치 매핑 |
+| `logs/05_write/<시각>-<공고>.json·.md` | 초안(md가 읽는 용) |
+| `logs/05_write/<시각>-<공고>.check.md` | 문장 검증 보고서(읽는 용) |
+| `inputs/eval/claim_check_golden.json` | 문장 검증기 평가용 정답 표본(자소서 본문이 들어 있어 git 제외). `scripts/eval_claim_checker.py`가 읽는다 |
+| `logs/archive/`, `inputs/archive/` | 실험·중간본을 옮겨 둔 곳(`logs/archive/README.txt`에 설명) |
+
+## C. 이번 건의 현재 상태 — 현대오토에버 2026 4분기 신입 (마감 2026-10-12(월) 13:00, 2026-10-10 기준)
+
+### 결정한 것
+| 항목 | 결정 | 누가 |
+|---|---|---|
+| 지원 직군 | 코딩테스트 전형 / 엔터프라이즈IT — Backend Developer (AutoEver Code 기능 개발·운영, 서울). 직무 정보는 사용자가 지원 페이지에서 정리해 준 것(원문 아님)을 공고 뒤에 붙인 파일로 쓴다 | 사용자 |
+| 기본 요건 | 지원 자격과 기본 스킬(Java/Spring, 관계형 DB·SQL, REST, Git·Docker·CI/CD·K8s 기본)은 어필도 검증도 하지 않는다. 소재 계획에서 "기본"으로 표시해 작성에서 뺀다(요구 1·2·9·10·11·13번) | 사용자 |
+| FINT에서 본인 역할 | vault `교육과정A.md`의 "본인 역할" 섹션 기준 | 사용자(vault에 직접 기록) |
+| 쓸 Talent Value | Make Bold Moves. 3번 소재는 회사B APK 디코딩 레벨 데이터 추출(약 2만 개)로 지정 | 사용자 |
+| 작성 방식 | 소재를 먼저 배정해 승인한 뒤 문항을 하나씩 따로 쓴다(문항끼리 같은 경험 반복 방지) | 사용자 제안 |
+| 소재 누락 대응 | A(소재를 사용자가 직접 지정, 구현됨) → C(경험 인벤토리, 마감 후). 근거는 설계 문서 21.2절 | 사용자 |
+
+### 현재 산출물 (모두 git 제외. 옛 것은 `logs/archive/`)
+| 단계 | 파일 | 상태 |
+|---|---|---|
+| 공고 텍스트 | `inputs/00_collect/hyundai_autoever_2026q4_backend.txt`(+ `.questions.txt`, `_원본_…/`) | 이미지 공고의 조각 전사본 + 직무 정보. 사용자가 원본과 전사본을 전부 대조하지는 않았다 |
+| 조사 보고서 | `logs/01_research/hyundai_autoever_2026q4_backend.md` | 주장 27개, **승인됨**. 공식 Talent Value 6개(사용자가 복사해 제공)가 항목별 정의와 함께 들어 있다 |
+| 앞 단계(분석·매핑·검증) | `logs/03_map/hyundai_autoever_2026q4_backend.json` | 요구 13개: 확인 5, 부분확인 5, 근거 없음 3(React 프론트, 품질·보안, 문서화·온보딩), 검증 플래그 2. vault 보강 뒤 재실행한 것 |
+| 가치 매핑 | `logs/03_map/…_values.md`(읽는 용) | 확인: Make Bold Moves, Work With Grit / 부분확인: Make It Yours, Win Through Growth / 근거 없음: Partner With Purpose, Practice Recognition |
+| 소재 계획 | `logs/04_plan/…__Make-Bold-Moves-회사B.md` | **승인됨**: 1번 FINT, 2번 프로젝트A 두 일화(사고 원인 규명, 멀티테넌트 전환), 3번 회사B |
+| 초안 | `logs/05_write/20261010-224809`(1번), `-224908`(2번), `-224932`(3번) `-hyundai_autoever_2026q4_backend.md` | 문항마다 3개. 근거와 대조해 고친 판. **사용자 검토 전** |
+
+vault에서 사용자가 한 일: `교육과정A.md`(기술 스택, 팀 운영 경험, 본인 역할 섹션), `프로젝트A 장애 사례.md`(맨 위 환경 표시). vault에는 파이프라인 이전에 쓴 초안 `06_career/자소서/2026년 하반기/26.10-현대오토에버.md`(10/9, 사용자 검토 전)가 따로 있다. 최종 문장은 사용자가 거기서 고친다.
+
+### 초안에서 직접 확인할 것 (설계 문서 22절)
+- 1번: AutoEver Code를 "사내 개발자가 쓰는 플랫폼"으로 단정한 문장(확인 안 된 추정), FINT에서 얻었다는 "만드는 사람이 쓰는 사람을 이해해야 한다"는 관점(근거에 없음), 차량 소프트웨어 개발 생산성과의 연결(근거 없는 추정), 끝의 "엔터프라이즈 규모 운영 경험은 입사 후" 문장(원치 않으면 삭제).
+- 2번: 문항이 묻는 "노력"(역량을 갖추려 한 것)이 약하다. 장애 사례 단락은 규모 숫자 없이 원인 분석 중심이고 사건 환경을 한 구절로 밝힌다(지울지는 사용자가 정한다).
+- 3번: 회사B 근거가 한 곳(`회사B.md:18`)이라 그 범위를 넘는 세부가 없는지.
+
+### 다음 할 일
+1. **사용자**: 초안 고르기·피드백 → `scripts/feedback_loop.py 공고.txt --question "…"`로 다듬기(소재 계획 기반 피드백 루프는 아직 `--plan`을 받지 않는다. 필요하면 연결).
+2. **문장 단위 근거 검증 만들기**(미구현, 내부 개발 가이드 "추후"): 초안 문장이 쓴 근거로 뒷받침되는지 표시. 이번 점검은 사람이 근거 원문과 대조했다.
+3. 2번 "노력" 소재 보강: 학습 자료를 `make_plan.py --extra-ref`로 지정해 소재 계획을 다시 만들거나, 2번만 `--guidance`로 다시 쓴다.
+4. **제출**(10/12 13:00): `career.hyundai-autoever.com`에서 코딩테스트 전형 / 엔터프라이즈IT Backend Developer 선택, 중복 지원 불가. 제출 뒤 vault `구직 이력` 갱신.
+5. 마감 뒤: 경험 인벤토리(C), 검색 순위 맹점 개선(설계 문서 20·21.2절), 지침 유무 블라인드 비교.

@@ -1,0 +1,104 @@
+{
+  "description": "자소서 인스턴스 매핑 단계 골든셋 v2 초안: 정답을 페이지가 아니라 '경험' 단위로 둔다. 사용자 확인 전이고 채점 코드에는 아직 연결하지 않았다.",
+  "created": "2026-10-03",
+  "status": "draft",
+  "matching_rule": "경험이 걸렸다 = 상위 k건(제외 관점 적용 후) 중 origin_pages에 속한 페이지가 있거나, 어떤 결과의 발췌(snippet)에 keywords 중 하나가 들어 있다. 원본 recall은 origin_pages만 따로 센다(origin_pages가 비어 있는 경험은 원본 recall에서 제외).",
+  "labeling_rule": "라벨은 내용(키워드 검색과 발췌)으로 정했고, 검색 순위를 보고 고치지 않는다. 이미 순위를 본 뒤에 만든 골든셋이라 블라인드 시험이 아니다. 나중에 라벨링 전에는 결과를 보지 않는 새 질의를 따로 만들어 확인한다.",
+  "experiences": [
+    {
+      "id": "devcraft",
+      "name": "DevCraft 2026 (AWS AgentCore·Strands 실습과 자소서 에이전트 구현)",
+      "origin_pages": ["04_project/DevCraft 2026.md"],
+      "keywords": ["DevCraft"],
+      "notes": "개념 페이지 AWS 에이전틱 AI 스택·AWS 운영 기초는 DevCraft 실습 정리라 서술 후보. daily·월간의 언급은 이름만 스치는 것이라 키워드로는 걸리지만 서술로 인정할지 정해야 함"
+    },
+    {
+      "id": "smilegate_intern",
+      "name": "회사C 인턴 (오토체스 RL 시뮬레이터)",
+      "origin_pages": ["04_project/오토체스_RL_시뮬레이터.md"],
+      "keywords": ["회사C", "회사C", "오토체스"],
+      "notes": "자소서 50여 개가 반복해서 서술"
+    },
+    {
+      "id": "fint",
+      "name": "FINT (교육과정A AI 에이전트 모의투자 서비스)",
+      "origin_pages": ["04_project/FINT.md", "04_project/FINT-Data.md"],
+      "keywords": ["FINT", "AI 에이전트 기반 모의투자", "AI Agent 기반 모의투자"],
+      "notes": "FINT-Data는 FINT의 데이터/ML 서버 페이지. 발췌상 ML 모델 서비스화이며 LLM 서비스가 아니라서 'LLM 기반 서비스' 질의의 정답으로는 약함"
+    },
+    {
+      "id": "graduation_project",
+      "name": "졸업작품 (Unity ML-Agents 강화학습 포커 에이전트)",
+      "origin_pages": ["04_project/세븐포커_RL_에이전트.md"],
+      "keywords": ["ML-Agents", "졸업 작품", "졸업작품", "포커 에이전트", "포커 학습", "세븐포커"],
+      "notes": "2026-10-04 사용자가 원본 페이지를 만들어 origin_pages에 넣음(그 전에는 원본 없음, 서술은 자소서·면접·커리어 개요에만). 키워드 '세븐포커'는 새 페이지의 이름이라 검색 결과를 본 뒤 더한 사후 조정"
+    },
+    {
+      "id": "customs_contest",
+      "name": "공공기관 주관 AI 모델 공모전 (학부 연구생 시절, 탈락)",
+      "origin_pages": ["04_project/공공기관_우범화물_공모전.md"],
+      "keywords": ["공공기관", "우범화물"],
+      "notes": "2026-10-04 사용자가 원본 페이지를 만들어 origin_pages에 넣음(그 전에는 원본 없음, 서술은 자소서와 지원서 공통 항목에만). 키워드 '우범화물'은 새 페이지의 이름이라 검색 결과를 본 뒤 더한 사후 조정"
+    },
+    {
+      "id": "undergrad_research",
+      "name": "학부 연구생 (인공지능 연구실, ML·NLP)",
+      "origin_pages": [],
+      "keywords": ["학부 연구생", "학부연구생", "연구실 인턴"],
+      "notes": "원본 페이지 없음. 서술은 자소서와 면접 모의면접 1·2회차에 있음"
+    },
+    {
+      "id": "qmd",
+      "name": "qmd로 knowledge-base 검색 구성·측정",
+      "origin_pages": ["03_study/qmd.md"],
+      "keywords": ["qmd"],
+      "notes": "사용자가 '되나?'라고 한 경험이라 질의에서는 maybe로만 쓴다"
+    },
+    {
+      "id": "adotbiz_llm",
+      "name": "프로젝트A의 LLM 대화 기능 (스트리밍 출력, tool_call 처리)",
+      "origin_pages": ["04_project/프로젝트A/프로젝트A.md"],
+      "keywords": ["tool_call", "tool call", "chat_streaming", "LLM 에이전트 대화"],
+      "notes": "사용자 판단: LLM 서비스를 만들었다기보다 LLM과 통신해 스트리밍을 출력하고 tool_call을 처리하는 수준이지만 일단 정답으로 본다. 키워드 '프로젝트A'만으로는 너무 넓어서 쓰지 않음. 학습 메모 03_study/동기와 비동기.md가 대화 스트리밍 코드를 다룸"
+    }
+  ],
+  "cases": [
+    {
+      "query": "AI Agent 개발 Framework 활용 경험",
+      "expected_status": "CONFIRMED",
+      "expected_experiences": [
+        {"id": "devcraft", "strength": "core"},
+        {"id": "smilegate_intern", "strength": "core"},
+        {"id": "fint", "strength": "core"},
+        {"id": "graduation_project", "strength": "core"},
+        {"id": "qmd", "strength": "maybe", "note": "사용자가 '되나?'라고 함"}
+      ]
+    },
+    {
+      "query": "LLM 기반 서비스 구현 경험",
+      "expected_status": "CONFIRMED",
+      "expected_experiences": [
+        {"id": "fint", "strength": "core", "note": "RAG를 넣고 Spring AI를 잠깐 써 봄"},
+        {"id": "adotbiz_llm", "strength": "core", "note": "사용자: 스트리밍·tool_call 수준이지만 일단 정답"},
+        {"id": "devcraft", "strength": "maybe"},
+        {"id": "qmd", "strength": "maybe"}
+      ]
+    },
+    {
+      "query": "AI 공모전·해커톤 실제 서비스 구현 경험",
+      "expected_status": "PARTIAL",
+      "expected_experiences": [
+        {"id": "customs_contest", "strength": "core"},
+        {"id": "devcraft", "strength": "maybe", "note": "공모전·해커톤은 아니지만 행사 성격"},
+        {"id": "undergrad_research", "strength": "maybe"}
+      ]
+    },
+    {
+      "query": "Kubernetes 운영 경험",
+      "expected_status": "TODO",
+      "expected_experiences": [
+        {"id": "adotbiz_llm", "strength": "maybe", "note": "어깨너머로 k8s로 운영된다는 걸 아는 정도. 사용자 판단은 '경험 거의 없음'. 이 경험의 키워드로는 걸리지 않을 수 있음"}
+      ]
+    }
+  ]
+}

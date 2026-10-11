@@ -1,0 +1,45 @@
+[project]
+name = "modular-agentic-system"
+version = "0.1.0"
+description = "수집·분석·매핑·작성 4단계(+검증)를 단계별로 갈아 끼울 수 있게 만든 범용 에이전트 템플릿"
+readme = "README.md"
+requires-python = ">=3.12"
+# core는 어떤 에이전트 프레임워크도 import하지 않는다 — 그래서 기본 의존성은 비어 있다.
+dependencies = []
+
+[project.optional-dependencies]
+# Strands 엔진(engines/strands)을 쓸 때만 필요하다.
+# 하한 버전은 DevCraft 워크숍(sample-aws-agentic-ai-workshop)의 pyproject.toml 기준이며,
+# 최신 버전과 호환되는지는 확인하지 않았다.
+strands = [
+    "strands-agents>=1.25.0",
+    "boto3>=1.40.51",
+]
+# AgentCore Runtime 배포와 Strands 내장 도구를 쓸 때만 필요하다(엔진 구현에는 필요 없다).
+agentcore = [
+    "strands-agents-tools>=0.2.11",
+    "bedrock-agentcore>=1.2.1",
+]
+# 조사 자료를 읽을 때 필요하다(tools/sources.py). pypdf는 텍스트 층이 있는 PDF의 글자를 뽑는 A 방식용이고(없으면 PDF는 모델 전사 B로 넘어간다),
+# Pillow는 세로로 긴 이미지를 조각으로 자르는 데 쓴다(없으면 이미지는 못 읽음으로 처리한다).
+sources = [
+    "pypdf>=4",
+    "pillow>=10",
+]
+# qmd MCP 프록시(services/qmd_proxy)를 서버로 돌릴 때만 필요하다. 로직(config·registry·protocol)은 이것 없이도 돈다.
+proxy = [
+    "starlette>=0.40",
+    "uvicorn>=0.30",
+]
+# httpx는 프록시 서버 테스트(Starlette TestClient)에, mcp는 공식 MCP 클라이언트로 호환성을 시험하는 테스트에 쓴다.
+dev = ["pytest", "httpx", "mcp"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/modular_agentic"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

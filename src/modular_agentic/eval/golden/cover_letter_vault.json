@@ -1,0 +1,49 @@
+{
+  "description": "자소서 인스턴스의 매핑 단계 골든셋: 요구 질의 하나에 대해 vault에서 근거가 되어야 하는 페이지.",
+  "created": "2026-10-03",
+  "provenance": "어떤 경험이 근거가 되는지는 사용자가 구술로 정함(2026-10-03). 그 경험이 담긴 페이지 경로는 LLM이 grep으로 추정한 것이라 사용자 확인 전이다.",
+  "strength": {
+    "core": "사용자가 명확히 근거로 든 경험. 검색이 이 페이지를 상위에 올려야 한다.",
+    "maybe": "사용자가 '되나?'라고 하거나 부분적으로만 해당. 점수 계산에서는 빼고 따로 본다."
+  },
+  "cases": [
+    {
+      "query": "AI Agent 개발 Framework 활용 경험",
+      "expected_status": "CONFIRMED",
+      "expected_pages": [
+        {"path": "04_project/DevCraft 2026.md", "strength": "core", "note": "DevCraft"},
+        {"path": "04_project/오토체스_RL_시뮬레이터.md", "strength": "core", "note": "회사C 인턴"},
+        {"path": "04_project/FINT.md", "strength": "core", "note": "FINT"},
+        {"path": "06_career/커리어 개요.md", "strength": "core", "note": "졸업작품(Unity ML-Agents). 전용 페이지는 없고 이 요약뿐"},
+        {"path": "03_study/qmd.md", "strength": "maybe", "note": "knowledge-base qmd. 사용자가 '되나?'라고 함"},
+        {"path": "04_project/FINT-Data.md", "strength": "maybe", "note": "FINT의 데이터/ML 서버 페이지. 사용자가 있을 거라고 함(2026-10-03)"}
+      ]
+    },
+    {
+      "query": "LLM 기반 서비스 구현 경험",
+      "expected_status": "CONFIRMED",
+      "expected_pages": [
+        {"path": "04_project/FINT.md", "strength": "core", "note": "FINT에서 RAG를 넣고 Spring AI를 잠깐 써 봄"},
+        {"path": "04_project/DevCraft 2026.md", "strength": "maybe", "note": "사용자가 '되려나'라고 함"},
+        {"path": "03_study/qmd.md", "strength": "maybe", "note": "knowledge-base qmd 활용. 사용자가 '되려나'라고 함"},
+        {"path": "04_project/FINT-Data.md", "strength": "maybe", "note": "FINT의 데이터/ML 서버 페이지. 사용자가 있을 거라고 함(2026-10-03)"}
+      ]
+    },
+    {
+      "query": "AI 공모전·해커톤 실제 서비스 구현 경험",
+      "expected_status": "PARTIAL",
+      "expected_pages": [
+        {"path": "06_career/지원서 공통 항목.md", "strength": "core", "note": "공공기관 공모전(학부연구생 ML 모델, 탈락). 이 페이지가 유일하게 담음"},
+        {"path": "04_project/DevCraft 2026.md", "strength": "maybe", "note": "공모전·해커톤은 아니지만 행사 성격"},
+        {"path": "06_career/커리어 개요.md", "strength": "maybe", "note": "학부연구생 ML 모델 개발"}
+      ]
+    },
+    {
+      "query": "Kubernetes 운영 경험",
+      "expected_status": "TODO",
+      "expected_pages": [
+        {"path": "04_project/프로젝트A/프로젝트A.md", "strength": "maybe", "note": "어깨너머로 k8s로 운영된다는 걸 아는 정도. 사용자 판단은 '경험 거의 없음'. 프로젝트A 인프라 정리 페이지는 아직 없음"}
+      ]
+    }
+  ]
+}
