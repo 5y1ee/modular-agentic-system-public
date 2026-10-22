@@ -33,6 +33,7 @@ from modular_agentic.tools.user_facts import load_user_facts, user_facts_mapping
 from modular_agentic.tools.vault_read import EXCERPT_CHARS, TRUNCATED_MARK, evidence_from_refs as _read_evidence
 from modular_agentic.core.plan_review import PlanRecord, approve, load_record, plan_path, render_plan_md, save_record
 from modular_agentic.core.serialize import load_state
+from modular_agentic.registry import make
 
 
 
@@ -112,8 +113,6 @@ def write_md(path: Path, record: PlanRecord, mappings, verdicts, brief) -> None:
 
 
 def cmd_make(args: argparse.Namespace) -> None:
-    from modular_agentic.engines.strands.planner import StrandsPlanner
-
     item_id = args.posting.stem
     item, mappings, verdicts = load_context(item_id)
     questions = read_questions(args.questions)
@@ -136,7 +135,7 @@ def cmd_make(args: argparse.Namespace) -> None:
         print(f"'{args.variant}'에 해당하는 가치 매핑을 못 찾았다(가치 문항이 아니면 무시해도 된다).")
     print(f"문항 {len(questions)}개, 요구 {len(mappings)}개(기본 {len(basic_ids)}개, 출처: {basic_source}), 회사 맥락 요구 {len(contexts or {})}개(--with-context {'켬' if args.with_context else '끔'}), 추가 재료 {len(extra)}개, 이름: {args.variant or '(없음)'}")
 
-    plan = StrandsPlanner().plan(item, questions, mappings, verdicts, brief=brief, extra=extra, basic_requirement_ids=basic_ids, notes=args.note, variant=args.variant, contexts=contexts)
+    plan = make("planner").plan(item, questions, mappings, verdicts, brief=brief, extra=extra, basic_requirement_ids=basic_ids, notes=args.note, variant=args.variant, contexts=contexts)
     label = args.label or args.variant
     plan = replace(plan, variant=label, warnings=[*plan.warnings, *truncation_notice(extra)])
     path = plan_path(PLAN_DIR, item_id, label)

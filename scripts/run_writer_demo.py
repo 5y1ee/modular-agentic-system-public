@@ -16,6 +16,8 @@
                   소재 계획이 `사용자:` 근거를 쓰면 --user-facts 파일(make_plan.py에 준 것과 같은 파일)이 필요하다. 이 근거는 vault와 대조하지 않았고 초안에 "검증 안 된 사용자 진술 포함"이 표시된다.
   --guidance "지시"  이번 작성에만 적용할 작성 지침(여러 줄 가능). 프롬프트 끝에 붙는다(예: 넣지 말 문장, 바로잡을 사실).
   --state-only    앞 단계(분석·매핑·검증)만 돌려 상태 파일을 만들고 끝낸다(작성하지 않는다). 문항은 필요 없다.
+                  상태는 logs/03_map/<공고>.json(원본)과 같은 이름의 .md(읽는 용: 요구별 상태·판단·근거·검증 플래그, 기본 요건 표시 반영)로 저장한다.
+                  저장된 상태를 읽을 때도 .md를 새로 쓴다(모델 호출 없음). 그래서 `mark`로 기본 요건을 바꾼 뒤 다시 실행하면 .md가 갱신된다.
   --n N           초안 개수(기본 3)
   --focus 1,3,5   재료로 쓸 요구의 번호(공고에서 뽑힌 순서, 1부터). 없으면 쓸 수 있는 요구 전부.
 초안은 `logs/05_write/<시각>-<공고>.json`에도 저장한다.
@@ -33,14 +35,21 @@ from pathlib import Path
 from common import ANALYZE_DIR, MAP_DIR, WRITE_DIR, drafts_to_md, load_approved_brief, load_known_experiences, load_plan_question, print_draft
 from modular_agentic.core.analysis_review import analysis_path, load_analysis, save_analysis
 from modular_agentic.core.serialize import dump_state, load_state
+from modular_agentic.core.state_review import render_state_md
 from modular_agentic.core.types import Analysis, Item
-from modular_agentic.engines.strands.analyzer import StrandsAnalyzer
-from modular_agentic.engines.strands.mapper import StrandsMapper
-from modular_agentic.engines.strands.verifier import StrandsVerifier
-from modular_agentic.engines.strands.writer import StrandsWriter
+from modular_agentic.registry import make
 from modular_agentic.instances.cover_letter.config import VAULT_DIR
 from modular_agentic.tools.vault_revision import ENV_NAME, stamp_environment
 
+
+
+def write_state_md(state_path: Path, item: Item, mappings, verdicts, vault_rev: str) -> Path:
+    """상태 JSON 옆에 읽는 용 .md를 쓴다. 모델을 부르지 않는다. 기본 요건 표시는 분석 결과(02_analyze)에서 읽는다."""
+    analysis = load_analysis(analysis_path(ANALYZE_DIR, item.id))
+    basic_ids = analysis.basic_requirement_ids if analysis is not None else []
+    md_path = state_path.with_suffix(".md")
+    md_path.write_text(render_state_md(item, mappings, verdicts, basic_ids, vault_rev), encoding="utf-8")
+    return md_path
 
 
 def build_state(item: Item, state_path: Path):
@@ -51,7 +60,7 @@ def build_state(item: Item, state_path: Path):
         requirements = saved.requirements
         print(f"분석 결과(02_analyze)를 읽었다: 요구 {len(requirements)}개 — 분석 호출은 건너뜀. 다시 분석하려면 analyze_posting.py run --refresh")
     else:
-        requirements = StrandsAnalyzer().analyze(item)
+        requirements = make("analyzer").analyze(item)
         print(f"분석: 요구 {len(requirements)}개 ({time.monotonic() - start:.1f}초)")
         if requirements:
             save_analysis(analysis_path(ANALYZE_DIR, item.id), Analysis(item_id=item.id, requirements=requirements))
@@ -60,11 +69,11 @@ def build_state(item: Item, state_path: Path):
         print(f"  {i}. [{r.kind or '분류 없음'}] {r.text}")
 
     start = time.monotonic()
-    mappings = StrandsMapper().map(requirements)
+    mappings = make("mapper").map(requirements)
     print(f"매핑: {time.monotonic() - start:.1f}초 — " + ", ".join(f"{m.status.value}" for m in mappings))
 
     start = time.monotonic()
-    verdicts = StrandsVerifier(load_known_experiences()).verify(mappings)
+    verdicts = make("verifier", experiences=load_known_experiences()).verify(mappings)
     print(f"검증: {time.monotonic() - start:.1f}초 — " + ", ".join(v.kind.value for v in verdicts))
 
     MAP_DIR.mkdir(parents=True, exist_ok=True)
@@ -72,6 +81,7 @@ def build_state(item: Item, state_path: Path):
     state["vault_rev"] = os.environ.get(ENV_NAME, "")  # 이 상태가 어느 vault로 만들어졌는지
     state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"상태 저장: {state_path}")
+    print(f"읽는 용: {write_state_md(state_path, item, mappings, verdicts, state['vault_rev'])}")
     return item, mappings, verdicts
 
 
@@ -103,6 +113,7 @@ def main() -> None:
         made_with = state_data.get("vault_rev") or "기록 없음"
         note = "" if made_with == vault_rev else "  ← 지금 vault와 다르다(근거가 그때의 vault에서 나온 것)"
         print(f"vault 상태: 상태 파일을 만들 때 {made_with} / 지금 {vault_rev}{note}")
+        print(f"읽는 용: {write_state_md(state_path, item, mappings, verdicts, state_data.get('vault_rev', ''))}")  # 이전 상태도·mark 뒤에도 갱신(모델 호출 없음)
     else:
         body = args.posting.read_text(encoding="utf-8")
         item = Item(id=args.posting.stem, source="file", title=body.splitlines()[0], body=body)
@@ -132,7 +143,7 @@ def main() -> None:
         question = question_plan.question
         extra |= {"plan": question_plan, "extra": plan_extra}
         print(f"소재 계획으로 쓴다: 문항 {args.number} — 중심 경험 {[e.name for e in question_plan.experiences]}")
-    drafts = StrandsWriter(guidance=args.guidance).write(item, question, mappings, verdicts, n=args.n, focus=focus, **extra)
+    drafts = make("writer", guidance=args.guidance).write(item, question, mappings, verdicts, n=args.n, focus=focus, **extra)
     print(f"\n작성: 초안 {len(drafts)}개 ({time.monotonic() - start:.1f}초)")
     number_of = {m.requirement.id: i for i, m in enumerate(mappings, 1)}
     for i, d in enumerate(drafts, 1):

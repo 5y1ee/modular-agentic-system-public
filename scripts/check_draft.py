@@ -21,7 +21,7 @@ from pathlib import Path
 
 from common import WRITE_DIR, collect_check_sources, load_approved_brief
 from modular_agentic.core.claim_check import flagged, render_check_md, summary
-from modular_agentic.engines.strands.claim_checker import StrandsClaimChecker
+from modular_agentic.registry import make
 
 
 def split_list(text: str) -> list[str]:
@@ -56,7 +56,7 @@ def main() -> None:
     evidence, claims = collect_check_sources(refs, claim_ids, load_approved_brief(item_id) if claim_ids else None, args.user_facts)
     print(f"검사할 근거: 내 근거 {len(evidence)}곳, 회사 사실 {len(claims)}개")
 
-    checks = StrandsClaimChecker().check(text, evidence, claims)
+    checks = make("claim_checker").check(text, evidence, claims)
     what = f"사용자가 고친 글({args.text.name})" if args.text else "초안"
     title = f"{item_id} — {args.draft.name}의 {args.number}번째 {what}"
     notes = [f"검사한 근거: 내 근거 {len(evidence)}곳({', '.join(e.ref for e in evidence) or '없음'}), 회사 사실 {len(claims)}개({', '.join(c.id for c in claims) or '없음'})"]

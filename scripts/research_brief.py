@@ -16,7 +16,7 @@
   5. approve 괜찮으면 승인한다. 이후 작성 스크립트가 이 보고서를 회사 사실로 쓴다.
 
 비용: run은 Bedrock을 부른다(조사 1회, 이미지·스캔본 PDF는 파일마다 전사 1회). 검색은 Tavily 호출이 질의 개수만큼 든다(한도·요금은 확인 전).
-검색 키: ~/.config/mas/tavily_key 파일(권한 600, 직접 만든다) 또는 환경변수 TAVILY_API_KEY. 이 코드는 키를 출력하지 않는다.
+검색 키: ~/.config/key/tavily_key 파일(권한 600, 직접 만든다) 또는 환경변수 TAVILY_API_KEY. 이 코드는 키를 출력하지 않는다.
 URL은 http·https 공개 주소만 읽는다. 못 읽은 곳은 이유와 함께 보고서에 남는다.
 PDF의 글자 추출은 `--extra sources`(pypdf)가 필요하다. 없으면 PDF는 모델 전사로 넘어간다.
 
@@ -32,6 +32,7 @@ from modular_agentic.core.types import Item
 from modular_agentic.instances.cover_letter.config import RESEARCH_QUERIES, RESEARCH_TOPICS
 from modular_agentic.tools.source_search import DEFAULT_MAX_TOTAL, QuerySpec, TavilySearch, find_sources
 from modular_agentic.tools.sources import EXTRACT, TRANSCRIBE, collect_docs
+from modular_agentic.registry import make
 
 
 
@@ -53,9 +54,6 @@ def load(item_id: str) -> BriefRecord:
 
 
 def cmd_run(args: argparse.Namespace) -> None:
-    from modular_agentic.engines.strands.researcher import StrandsResearcher
-    from modular_agentic.engines.strands.transcriber import StrandsTranscriber
-
     body = args.posting.read_text(encoding="utf-8")
     meta = {"company": args.company} if args.company else {}
     item = Item(id=args.posting.stem, source="file", title=body.splitlines()[0], body=body, meta=meta)
@@ -83,13 +81,13 @@ def cmd_run(args: argparse.Namespace) -> None:
         found = result.hits
 
     print(f"자료 모으는 중: 공고 + 폴더 {upload_dir}({'있음' if upload_dir.is_dir() else '없음'}) + 내가 준 URL {len(args.url)}개 + 검색으로 찾은 URL {len(found)}개")
-    docs = collect_docs(item, upload_dir=upload_dir, urls=args.url, found=found, transcriber=StrandsTranscriber(), force=force)
+    docs = collect_docs(item, upload_dir=upload_dir, urls=args.url, found=found, transcriber=make("transcriber"), force=force)
     for d in docs:
         state = "읽음" if d.status.value == "읽음" else f"못 읽음 — {d.reason}"
         by = f" ({d.found_by})" if d.found_by else ""
         print(f"  {d.id} {d.kind.value} {d.locator} [{d.text_origin.value}]{by} {state}")
 
-    brief = StrandsResearcher(topics=RESEARCH_TOPICS).research(item, docs)
+    brief = build_researcher().research(item, docs)
     save(BriefRecord(brief=brief, docs=docs, approved=False))
     print(f"\n조사 보고서를 저장했다(승인 전): {md_path(item.id)}")
     print(f"주장 {len(brief.claims)}개, 못 읽은 자료 {len(brief.unread)}건, 못 다룬 주제 {len(brief.gaps)}개")
@@ -98,9 +96,7 @@ def cmd_run(args: argparse.Namespace) -> None:
 
 def build_researcher():
     """조사 단계 구현. 테스트는 이 함수를 가짜로 바꿔 끼운다."""
-    from modular_agentic.engines.strands.researcher import StrandsResearcher
-
-    return StrandsResearcher(topics=RESEARCH_TOPICS)
+    return make("researcher", topics=RESEARCH_TOPICS)
 
 
 def cmd_reresearch(args: argparse.Namespace) -> None:
@@ -126,9 +122,7 @@ def cmd_reresearch(args: argparse.Namespace) -> None:
 
     docs = list(old.docs)
     if args.add:
-        from modular_agentic.engines.strands.transcriber import StrandsTranscriber
-
-        transcriber = StrandsTranscriber()
+        transcriber = make("transcriber")
         known = {d.locator for d in docs}
         next_number = max((int(d.id[1:]) for d in docs if d.id[1:].isdigit()), default=0) + 1
         for path in args.add:

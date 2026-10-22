@@ -22,6 +22,8 @@ from modular_agentic.core.analysis_review import analysis_path, mark_basic, save
 from modular_agentic.core.brief_review import approved_brief, load_record, without_posting_only_claims
 from modular_agentic.core.serialize import load_state
 from modular_agentic.core.types import Analysis, Item
+from modular_agentic.instances.profile import profile_of_text
+from modular_agentic.registry import make
 
 
 def parse_numbers(text: str) -> list[int]:
@@ -45,15 +47,15 @@ def require_analysis(item_id: str) -> Analysis:
 
 
 def cmd_run(args: argparse.Namespace) -> None:
-    from modular_agentic.engines.strands.analyzer import StrandsAnalyzer
-
     item_id = args.posting.stem
     path = analysis_path(ANALYZE_DIR, item_id)
     if path.exists() and not args.refresh:
         sys.exit(f"이미 있다: {path}\n다시 만들려면 --refresh(기본 요건 표시와 회사 맥락이 사라진다).")
     body = args.posting.read_text(encoding="utf-8")
     item = Item(id=item_id, source="file", title=body.splitlines()[0], body=body)
-    requirements = StrandsAnalyzer().analyze(item)
+    profile = profile_of_text(body)  # 업무(자소서·제안서)는 공고 파일의 `업무:` 줄로 정한다
+    print(f"업무: {profile.label}")
+    requirements = make("analyzer", profile=profile).analyze(item)  # 구현은 registry(MAS_IMPL_ANALYZER)
     if not requirements:
         sys.exit("요구를 뽑지 못했다(본문이 비었거나 요구가 없다).")
     save_analysis(path, Analysis(item_id=item_id, requirements=requirements), approved_brief_or_none(item_id))
@@ -77,8 +79,6 @@ def approved_brief_or_none(item_id: str):
 
 
 def cmd_context(args: argparse.Namespace) -> None:
-    from modular_agentic.engines.strands.context_linker import StrandsContextLinker
-
     analysis = require_analysis(args.item_id)
     path = brief_path(args.item_id)
     if not path.exists() or not load_record(path).approved:
@@ -89,7 +89,7 @@ def cmd_context(args: argparse.Namespace) -> None:
     if not brief.claims:
         sys.exit("공고 밖에서 나온 조사 주장이 없다(웹 자료나 직접 올린 자료의 주장이 필요하다).")
     print(f"조사 주장 {len(record.brief.claims)}개 중 {len(brief.claims)}개로 연결한다." + (f" {notice[0]}" if notice else ""))
-    context, warnings = StrandsContextLinker().link(analysis.requirements, brief)
+    context, warnings = make("context_linker").link(analysis.requirements, brief)
     warnings = [*notice, *warnings]
     updated = with_context(analysis, context, warnings)
     save_analysis(analysis_path(ANALYZE_DIR, args.item_id), updated, brief)

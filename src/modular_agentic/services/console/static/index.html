@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modular Agentic Console</title>
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+<style>
+:root {
+  --left: 230px; --right: 360px; --header: 51px;
+  --bg: #f6f7f9; --panel: #ffffff; --ink: #1d2330; --muted: #667085; --line: #e3e6ec;
+  --accent: #2f5bea; --accent-soft: #e8eeff; --ok: #1a7f4b; --warn: #b54708; --bad: #c0362c;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #14171d; --panel: #1c2028; --ink: #e6e8ec; --muted: #98a2b3; --line: #2c323d;
+          --accent: #7c9bff; --accent-soft: #232c45; --ok: #4cc38a; --warn: #f0a050; --bad: #f07068; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.55 -apple-system, "Pretendard", "Noto Sans KR", sans-serif; }
+header { display: flex; align-items: center; gap: 12px; padding: 10px 20px; border-bottom: 1px solid var(--line); background: var(--panel); flex-wrap: wrap; }
+header h1 { font-size: 16px; margin: 0; }
+header span { color: var(--muted); font-size: 12px; }
+header .model { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+header .model input { width: clamp(140px, 22vw, 260px); padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); font: inherit; }
+main { display: grid; grid-template-columns: var(--left) minmax(0, 1fr) var(--right); height: calc(100vh - var(--header)); }
+#drawerBtn.active { background: var(--accent-soft); border-color: var(--accent); }
+main.no-right { grid-template-columns: var(--left) minmax(0, 1fr); }
+main.no-right .right { display: none; }
+.jobs h2 { cursor: pointer; user-select: none; }
+.jobs.folded #jobs { display: none; }
+.jobs.folded { max-height: none; }
+#drawerBtn .badge { background: var(--warn); color: #fff; border-radius: 9px; padding: 0 6px; font-size: 11px; margin-left: 4px; }
+aside, section { overflow: auto; }
+.left { border-right: 1px solid var(--line); padding: 12px; background: var(--panel); }
+.right { border-left: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; }
+h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 14px 0 6px; }
+.item { padding: 7px 9px; border-radius: 6px; cursor: pointer; word-break: break-all; font-size: 13px; }
+.item:hover { background: var(--accent-soft); }
+.item.active { background: var(--accent); color: #fff; }
+.item.active .tag { color: #fff; border-color: rgba(255,255,255,.6); }
+.folder { margin-bottom: 10px; }
+.folder-head { display: flex; align-items: center; gap: 6px; padding: 6px 4px; cursor: pointer; border-bottom: 1px solid var(--line); }
+.folder-head b { font-size: 13px; }
+.folder-head small { color: var(--muted); font-size: 11.5px; }
+.folder-head .btn { margin-left: auto; }
+.folder-head .btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.folder .items { padding: 4px 0 0 10px; }
+.folder .empty { padding: 4px 9px; font-size: 12px; }
+.tag { white-space: nowrap; font-size: 11px; padding: 1px 6px; border-radius: 9px; border: 1px solid var(--line); color: var(--muted); margin-left: 4px; }
+.center { padding: 16px 20px; container-type: inline-size; min-width: 0; }
+.stages { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; }
+.stage { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 9px; cursor: pointer; }
+.stage.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.stage.off { opacity: .45; cursor: default; }
+.stage b { display: block; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stage small { color: var(--muted); display: block; font-size: 11.5px; }
+.stage .impl { color: var(--accent); }
+.row { display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 14px; }
+.side { min-width: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+.docs .doc { padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 12.5px; word-break: break-all; }
+.docs .doc:hover { background: var(--accent-soft); }
+.docs .doc.active { background: var(--accent-soft); font-weight: 600; }
+.btn { border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 13px; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.small { padding: 3px 8px; font-size: 12px; }
+.btn:disabled { opacity: .5; cursor: default; }
+.actions .btn { display: block; width: 100%; text-align: left; margin-bottom: 6px; }
+.actions .btn small { display: block; color: var(--muted); font-size: 11px; }
+.actions .btn .needs { color: var(--warn); }
+.actions .more { background: none; border: none; color: var(--muted); font-size: 12px; cursor: pointer; padding: 2px 0; }
+.viewer { min-height: 60vh; }
+.viewer .md { overflow-wrap: anywhere; }
+.viewer .md table { border-collapse: collapse; font-size: 12.5px; display: block; overflow-x: auto; }
+.viewer .md th, .viewer .md td { border: 1px solid var(--line); padding: 4px 6px; vertical-align: top; }
+.viewer { min-width: 0; }
+.viewer iframe { width: 100%; height: 72vh; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+.empty { color: var(--muted); font-size: 13px; }
+.jobs { padding: 10px 12px; border-bottom: 1px solid var(--line); max-height: 45%; overflow: auto; }
+.job { border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px; margin-bottom: 6px; font-size: 12.5px; }
+.job .st { font-weight: 600; }
+.st.pending { color: var(--warn); } .st.running { color: var(--accent); } .st.done { color: var(--ok); }
+.st.failed, .st.cancelled { color: var(--bad); }
+.job pre { max-height: 160px; overflow: auto; background: var(--bg); padding: 6px; border-radius: 4px; font-size: 11px; white-space: pre-wrap; }
+.chat { flex: 1; display: flex; flex-direction: column; min-height: 0; padding: 10px 12px; }
+.msgs { flex: 1; overflow: auto; }
+.msg { margin: 6px 0; padding: 8px 10px; border-radius: 8px; font-size: 13px; overflow-wrap: anywhere; }
+.msg.user { background: var(--accent-soft); margin-left: 30px; }
+.msg.bot { background: var(--bg); margin-right: 10px; }
+.msg.bot table { font-size: 12px; }
+.chat form { display: flex; gap: 6px; margin-top: 8px; }
+.chat textarea { flex: 1; resize: vertical; min-height: 40px; border: 1px solid var(--line); border-radius: 6px; padding: 6px; background: var(--bg); color: var(--ink); font: inherit; }
+dialog { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--ink); width: min(560px, 92vw); }
+dialog label { display: block; font-size: 12.5px; margin: 9px 0 3px; }
+dialog label small { color: var(--muted); }
+dialog input, dialog textarea, dialog select { width: 100%; padding: 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); font: inherit; }
+dialog fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 10px 0 4px; padding: 4px 10px 8px; }
+dialog legend { font-size: 12px; color: var(--muted); padding: 0 4px; }
+.cost { background: var(--accent-soft); padding: 6px 8px; border-radius: 6px; font-size: 12.5px; margin: 8px 0; }
+.err { color: var(--bad); font-size: 12.5px; }
+/* 가운데 칸이 좁아지면(화면 전체가 아니라 가운데 칸 너비 기준) 단계 카드를 3개씩, 버튼·문서 목록을 문서 보기 위로 쌓는다 */
+@container (max-width: 640px) { .stages { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@container (max-width: 720px) {
+  .row { grid-template-columns: 1fr; }
+  .side { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  .side .docs { margin-top: 0 !important; }
+  .viewer { min-height: 50vh; }
+}
+@media (max-width: 1400px) { :root { --left: 200px; --right: 320px; } }
+/* 오른쪽(작업·대화)을 서랍으로 접는다 */
+@media (max-width: 1150px) {
+  main { grid-template-columns: var(--left) minmax(0, 1fr); }
+  .right { position: fixed; top: var(--header); right: 0; bottom: 0; width: min(380px, 92vw); z-index: 10;
+           transform: translateX(100%); visibility: hidden; transition: transform .2s, visibility .2s; }
+  .right.open { transform: translateX(0); visibility: visible; box-shadow: -6px 0 20px rgba(0,0,0,.18); }
+  main.no-right .right { display: flex; }  /* 좁은 화면에서는 서랍(open)이 여닫음을 맡는다 */
+  header > span { display: none; }
+}
+/* 한 칸: 공고 목록은 가로 띠, 단계 카드는 가로 스크롤 */
+@media (max-width: 760px) {
+  main { grid-template-columns: 1fr; height: auto; }
+  .left { border-right: none; border-bottom: 1px solid var(--line); padding: 8px 12px; }
+  .left h2 { display: none; }
+  .folder .items { display: flex; gap: 6px; overflow-x: auto; padding: 4px 0; }
+  .item { flex: 0 0 auto; max-width: 70vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item.collect { margin-bottom: 0; }
+  .center { padding: 12px 16px; }
+  .stages { display: flex; overflow-x: auto; padding-bottom: 4px; }
+  .stage { flex: 0 0 132px; }
+  header { padding: 8px 16px; }
+  #drawerBtn { margin-left: auto; order: 2; }
+  header .model { margin-left: 0; width: 100%; order: 3; }
+  header .model input { flex: 1; width: auto; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Modular Agentic Console</h1><span>수집 → 조사 → 분석 → 매핑·검증 → 소재 계획 → 작성·문장 검증 · 사람 확인 뒤 실행</span>
+  <label class="model">모델(부품) <input id="model" placeholder="비우면 기본값 us.anthropic.claude-sonnet-4-6"></label>
+  <button class="btn small" id="drawerBtn">작업·대화<span class="badge" id="badge" hidden></span></button>
+</header>
+<main id="main">
+  <aside class="left">
+    <h2>업무</h2>
+    <div id="items"></div>
+  </aside>
+  <section class="center">
+    <div class="stages" id="stages"></div>
+    <div class="row">
+      <div class="side">
+        <div class="card actions" id="actions"></div>
+        <div class="card docs" id="docs" style="margin-top:12px"></div>
+      </div>
+      <div class="card viewer" id="viewer"><p class="empty">왼쪽에서 공고를 고르고 단계를 누르면 결과 문서가 여기 보인다.</p></div>
+    </div>
+  </section>
+  <aside class="right" id="right">
+    <div class="jobs" id="jobsBox"><h2 id="jobsHead">▾ 작업(실행 대기열)</h2><div id="jobs"></div></div>
+    <div class="chat">
+      <h2>에이전트와 대화</h2>
+      <div class="msgs" id="msgs"><div class="msg bot">공고를 고른 뒤 말을 걸면, 결과 문서를 읽거나 단계를 다시 돌리는 작업을 대기열에 올린다. 실행은 위 작업 목록에서 [실행]을 눌러야 시작된다.</div></div>
+      <form id="chatForm"><textarea id="chatInput" placeholder="예: 매핑 결과에서 근거가 약한 요구를 알려줘 / 2번 문항 초안을 지침 넣어 다시 써줘"></textarea><button class="btn primary">보내기</button></form>
+    </div>
+  </aside>
+</main>
+<dialog id="dlg"><form method="dialog" id="dlgForm"></form></dialog>
+<script>
+// 단계: [키, 이름, 설명, 이 단계 작업이 쓰는 구현 단계(registry)]
+const STAGES = [
+  ["collect", "수집", "공고 후보 찾기·가져오기", ["collector"]],
+  ["research", "조사", "회사 조사 보고서", ["researcher"]],
+  ["analyze", "분석", "요구 목록·기본 요건", ["analyzer"]],
+  ["map", "매핑·검증", "요구별 근거와 검증", ["mapper", "verifier"]],
+  ["plan", "소재 계획", "문항별 소재 배정", ["planner"]],
+  ["write", "작성·검증", "초안과 문장 검증", ["writer", "claim_checker"]],
+];
+// 버튼 순서·선행 조건·접기(more). 화면 안내용이고 실제 검사는 스크립트가 한다
+const HINTS = {
+  "collect.search": { order: 1 }, "collect.import": { order: 2, needs: "후보 문서가 있어야 함" },
+  "research.run": { order: 1 }, "research.approve": { order: 2, needs: "보고서를 읽은 뒤" }, "research.drop": { more: true },
+  "analyze.run": { order: 1 }, "analyze.mark": { order: 2, needs: "요구 목록이 있어야 함" }, "analyze.compare": { order: 3 },
+  "analyze.context": { more: true, needs: "승인된 조사 보고서 필요" },
+  "map.run": { order: 1, needs: "요구 목록 권장(없으면 함께 뽑음)" },
+  "plan.make": { order: 1, needs: "매핑 결과 + 문항 파일 필요" }, "plan.approve": { order: 2, needs: "계획을 읽은 뒤" },
+  "write.run": { order: 1, needs: "승인된 소재 계획 또는 문항" }, "check.run": { order: 2, needs: "초안 필요" },
+};
+const LABELS = {  // 칸 이름(한글)과 예시
+  day: ["날짜", "2026-10-20"], goal: ["찾을 공고", "금융권 백엔드 신입, 서울"], max: ["최대 후보 수", "5"],
+  title: ["제목(회사 직무)", "가나은행 IT 백엔드"], text: ["공고 본문", "공고 글을 그대로 붙여 넣는다"], link: ["원문 주소", "https://…"],
+  candidates: ["후보 파일", ""], pick: ["가져올 번호", "1,3"],
+  company: ["회사 이름", "현대오토에버"], url: ["직접 줄 웹 주소(줄마다 하나)", "https://…"], query: ["직접 줄 검색어(줄마다 하나)", "현대오토에버 SDV"],
+  claim_ids: ["뺄 주장 번호", "c3,c7"], refresh: ["다시 만들기", ""], basic: ["기본 요건 번호(어필하지 않을 것)", "1,2,9"],
+  variant: ["소재 계획 이름", "Make Bold Moves 회사B"], note: ["추가 지시", "2번 문항은 협업 경험으로"], with_context: ["회사 맥락을 입력에 넣기", ""],
+  number: ["문항 번호", "2"], question: ["문항(계획 없이 쓸 때)", "지원 동기를 쓰시오 (800자)"], focus: ["재료로 쓸 요구 번호", "1,3,5"],
+  n: ["초안 개수", "3"], guidance: ["이번 작성 지침", "첫 문장을 회사 접점으로 시작"], draft: ["초안 파일", ""],
+  instance: ["업무", ""],
+};
+const STAGE_NAMES = { collector: "수집", researcher: "조사", transcriber: "이미지 전사", analyzer: "분석", context_linker: "회사 맥락",
+  mapper: "매핑", verifier: "검증", planner: "소재 계획", writer: "작성", claim_checker: "문장 검증" };
+const state = { items: [], actions: [], impls: {}, tasks: [], collectTask: "cover_letter", folded: {}, item: null, stage: "research", results: null, drafts: [], candidates: [], doc: null, showMore: false };
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const md = (t) => DOMPurify.sanitize(marked.parse(t));
+const drawerMode = () => window.matchMedia("(max-width: 1150px)").matches;
+const ui = { rightHidden: false, jobsFolded: false };
+try { Object.assign(ui, JSON.parse(localStorage.getItem("mas_ui") || "{}")); } catch (e) {}
+function applyUi() {
+  $("main").classList.toggle("no-right", ui.rightHidden);
+  $("jobsBox").classList.toggle("folded", ui.jobsFolded);
+  $("jobsHead").textContent = `${ui.jobsFolded ? "▸" : "▾"} 작업(실행 대기열)`;
+  $("drawerBtn").classList.toggle("active", drawerMode() ? $("right").classList.contains("open") : !ui.rightHidden);
+  try { localStorage.setItem("mas_ui", JSON.stringify(ui)); } catch (e) {}
+}
+function showJobs() {  // 작업을 올렸을 때 [실행]이 보이게 연다
+  if (drawerMode()) $("right").classList.add("open"); else ui.rightHidden = false;
+  ui.jobsFolded = false; applyUi();
+}
+$("drawerBtn").onclick = () => {  // 넓은 화면: 오른쪽 칸 접기 / 좁은 화면: 서랍 열고 닫기
+  if (drawerMode()) $("right").classList.toggle("open"); else ui.rightHidden = !ui.rightHidden;
+  applyUi();
+};
+$("jobsHead").onclick = () => { ui.jobsFolded = !ui.jobsFolded; applyUi(); };
+window.matchMedia("(max-width: 1150px)").addEventListener("change", applyUi);
+applyUi();
+try { $("model").value = localStorage.getItem("mas_model") || ""; state.folded = JSON.parse(localStorage.getItem("mas_folded") || "{}"); } catch (e) {}
+const taskOf = (name) => state.tasks.find((k) => k.name === name) || state.tasks[0];
+const pasteOnly = () => taskOf(state.collectTask).collectors.every((c) => c === "paste");  // 붙여넣기만 쓰는 업무(후보 단계가 없다)
+const collectDocs = (docs) => docs.filter((d) => taskOf(state.collectTask).collectors.includes(d.name.replace(/\.md$/, "").split("-").pop()));
+$("model").onchange = () => { try { localStorage.setItem("mas_model", $("model").value.trim()); } catch (e) {} };
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
+  const type = res.headers.get("content-type") || "";
+  const body = type.includes("json") ? await res.json() : await res.text();
+  if (!res.ok) throw new Error(body.error || body);
+  return body;
+}
+
+async function init() {
+  [state.items, state.actions, state.impls, state.tasks] = await Promise.all([api("/api/items"), api("/api/actions"), api("/api/impls"), api("/api/tasks")]);
+  renderItems(); renderStages(); refreshJobs();
+  // 주소로 바로 열기: #item=<공고> 또는 #collect=<업무>, 이어서 &stage=<단계>&doc=<문서 이름>&form=<작업 이름>(발표·스크린샷용)
+  const hash = new URLSearchParams(location.hash.slice(1));
+  const wanted = hash.get("item"), collectTask = hash.get("collect");
+  if (collectTask && state.tasks.some((k) => k.name === collectTask)) { state.collectTask = collectTask; await selectItem("__collect__"); }
+  else if (wanted && state.items.some((it) => it.id === wanted)) await selectItem(wanted);
+  else return;
+  if (hash.get("stage") && stageEnabled(hash.get("stage"))) { state.stage = hash.get("stage"); state.doc = null; renderStages(); renderStage(); }
+  const doc = hash.get("doc") && (state.results[state.stage] || []).find((d) => d.name === hash.get("doc"));
+  if (doc) await openDoc(doc.path);
+  if (hash.get("form") && state.actions.some((a) => a.key === hash.get("form"))) openForm(hash.get("form"));
+}
+
+function renderItems() {  // 업무별 폴더: 업무마다 그 업무의 공고·보기 전용 묶음과 [＋ 수집]
+  const collecting = state.item && state.item.kind === "collect";
+  $("items").innerHTML = state.tasks.map((task) => {
+    const items = state.items.filter((it) => it.kind !== "collect" && it.task === task.label);
+    const folded = state.folded[task.name];
+    const list = items.map((it) => {
+      const active = state.item && state.item.id === it.id ? "active" : "";
+      return `<div class="item ${active}" data-id="${esc(it.id)}">${esc(it.id)}${it.kind === "showcase" ? '<span class="tag">보기 전용</span>' : ""}</div>`;
+    }).join("") || '<p class="empty">아직 없다. [＋ 수집]으로 가져온다.</p>';
+    return `<div class="folder"><div class="folder-head" data-fold="${task.name}"><b>${folded ? "▸" : "▾"} ${esc(task.label)}</b><small>${esc(task.item_label)} ${items.length}</small>` +
+      `<button class="btn small ${collecting && state.collectTask === task.name ? "active" : ""}" data-collect="${task.name}">＋ 수집</button></div>` +
+      (folded ? "" : `<div class="items">${list}</div>`) + "</div>";
+  }).join("");
+  document.querySelectorAll(".item").forEach((el) => el.onclick = () => selectItem(el.dataset.id));
+  document.querySelectorAll("[data-collect]").forEach((el) => el.onclick = (ev) => { ev.stopPropagation(); state.collectTask = el.dataset.collect; selectItem("__collect__"); });
+  document.querySelectorAll("[data-fold]").forEach((el) => el.onclick = () => {
+    state.folded[el.dataset.fold] = !state.folded[el.dataset.fold];
+    try { localStorage.setItem("mas_folded", JSON.stringify(state.folded)); } catch (e) {}
+    renderItems();
+  });
+}
+
+async function selectItem(id) {
+  state.item = state.items.find((it) => it.id === id); state.doc = null;
+  if (state.item.kind === "collect") state.stage = "collect";
+  else if (state.item.kind === "showcase") { if (state.stage === "collect") state.stage = "analyze"; }
+  else if (!state.item.stages.includes(state.stage)) state.stage = state.item.stages.includes("research") ? "research" : "analyze";
+  renderItems(); await loadResults();
+}
+
+async function loadResults() {
+  if (!state.item) return;
+  const data = await api(`/api/items/${encodeURIComponent(state.item.id)}/results`);
+  state.results = data.results; state.drafts = data.drafts; state.candidates = data.candidates;
+  renderStages(); renderStage();
+}
+
+function implSummary(stages) {
+  return stages.map((s) => { const n = s === "collector" && state.item && state.item.kind === "collect"
+      ? taskOf(state.collectTask).collectors.length : (state.impls[s] || []).length; return n > 1 ? `${STAGE_NAMES[s]} 구현 ${n}개` : ""; }).filter(Boolean).join(" · ");
+}
+
+function stageEnabled(key) {
+  if (!state.item) return true;
+  if (state.item.kind === "collect") return key === "collect";
+  if (state.item.kind === "run") return key !== "collect" && state.item.stages.includes(key);  // 업무가 아직 지원하지 않는 단계는 끈다
+  return key !== "collect";
+}
+
+function renderStages() {
+  $("stages").innerHTML = STAGES.map(([key, name, stageSub, implStages], i) => {
+    let sub = stageSub;
+    const n = !state.results ? 0 : key === "collect" ? collectDocs(state.results.collect).length : state.results[key].length;
+    const impl = implSummary(implStages);
+    if (key === "collect" && state.item && state.item.kind === "collect") sub = `${taskOf(state.collectTask).item_label} 가져오기`;  // 업무에 맞는 말
+    return `<div class="stage ${state.stage === key ? "active" : ""} ${stageEnabled(key) ? "" : "off"}" data-key="${key}"><b>${i}. ${name}</b><small>${sub} · 문서 ${n}</small>${impl ? `<small class="impl">${impl}</small>` : ""}</div>`;
+  }).join("");
+  document.querySelectorAll(".stage").forEach((el) => el.onclick = () => {
+    if (!stageEnabled(el.dataset.key)) return;
+    state.stage = el.dataset.key; state.doc = null; renderStages(); renderStage();
+  });
+}
+
+function actionLabel(a) {  // 수집은 업무에 맞는 말로: 제안서처럼 붙여넣기만 쓰면 "제안요청서 붙여넣기"
+  if (a.key !== "collect.search" || !(state.item && state.item.kind === "collect")) return [a.label, a.cost];
+  const task = taskOf(state.collectTask);
+  return pasteOnly() ? [`${task.item_label} 붙여넣기`, "모델 호출 없음, 바로 저장"] : [`${task.item_label} 후보 찾기`, a.cost];
+}
+
+function actionButton(a) {
+  const h = HINTS[a.key] || {};
+  const [label, cost] = actionLabel(a);
+  return `<button class="btn" data-key="${a.key}">${h.order ? h.order + ". " : ""}${esc(label)}<small>${esc(cost)}</small>${h.needs ? `<small class="needs">${esc(h.needs)}</small>` : ""}</button>`;
+}
+
+function renderStage() {
+  const it = state.item;
+  if (!it) { $("actions").innerHTML = '<p class="empty">공고를 고른다.</p>'; return; }
+  const acts = state.actions.filter((a) => a.stage === state.stage && !(it.kind === "collect" && a.key === "collect.import" && pasteOnly()))
+    .sort((x, y) => ((HINTS[x.key] || {}).order || 9) - ((HINTS[y.key] || {}).order || 9));
+  const main = acts.filter((a) => !(HINTS[a.key] || {}).more), more = acts.filter((a) => (HINTS[a.key] || {}).more);
+  $("actions").innerHTML = it.kind === "showcase"
+    ? '<p class="empty">보기 전용 묶음이다(세션에서 같은 단계 구조를 손으로 따라간 결과를 마스킹한 것). 실행 버튼이 없다.</p>'
+    : `<h2>실행${it.kind === "collect" ? ` — ${esc(taskOf(state.collectTask).label)} 수집` : ""}</h2>` + main.map(actionButton).join("") +
+      (more.length ? `<button class="more" id="moreBtn">${state.showMore ? "▾ 접기" : `▸ 더 보기 (${more.length})`}</button>` + (state.showMore ? more.map(actionButton).join("") : "") : "");
+  document.querySelectorAll(".actions .btn").forEach((el) => el.onclick = () => openForm(el.dataset.key));
+  if ($("moreBtn")) $("moreBtn").onclick = () => { state.showMore = !state.showMore; renderStage(); };
+  let docs = state.results ? state.results[state.stage] : [];
+  if (it.kind === "collect") docs = collectDocs(docs);
+  $("docs").innerHTML = "<h2>결과 문서</h2>" + (docs.length ? docs.map((d) =>
+    `<div class="doc ${state.doc === d.path ? "active" : ""}" data-path="${esc(d.path)}">${esc(d.name)}</div>`).join("") : '<p class="empty">아직 없다.</p>');
+  document.querySelectorAll(".doc").forEach((el) => el.onclick = () => openDoc(el.dataset.path));
+  if (!state.doc && docs.length) openDoc(docs[0].path);
+  else if (!docs.length) $("viewer").innerHTML = '<p class="empty">이 단계의 결과 문서가 없다.</p>';
+}
+
+async function openDoc(path) {
+  state.doc = path;
+  document.querySelectorAll(".doc").forEach((el) => el.classList.toggle("active", el.dataset.path === path));
+  const text = await api(`/api/file?path=${encodeURIComponent(path)}`);
+  if (path.endsWith(".html")) {
+    $("viewer").innerHTML = '<iframe sandbox=""></iframe>'; $("viewer").querySelector("iframe").srcdoc = text;
+  } else {
+    $("viewer").innerHTML = `<div class="md">${md(text)}</div>`;
+  }
+}
+
+function field(p) {
+  const id = `f_${p.name}`;
+  const [name, example] = LABELS[p.name] || [p.name, ""];
+  const label = `<label for="${id}">${esc(name)}${p.required ? " *" : ""} <small>${esc(p.help)}</small></label>`;
+  if (p.kind === "bool") return `<label><input type="checkbox" id="${id}" style="width:auto"> ${esc(name)} <small>${esc(p.help)}</small></label>`;
+  if (p.kind === "draft" || p.kind === "candidates") {
+    const list = p.kind === "draft" ? state.drafts : state.candidates;
+    return label + (list.length ? `<select id="${id}">${list.map((d) => `<option>${esc(d)}</option>`).join("")}</select>` : '<p class="err">고를 파일이 없다. 앞 단계를 먼저 돌린다.</p>');
+  }
+  if (p.kind === "longtext") return label + `<textarea id="${id}" rows="10" placeholder="${esc(example)}"></textarea>`;
+  if (p.kind === "choice") return label + `<select id="${id}">${state.tasks.map((k) => `<option value="${esc(k.name)}">${esc(k.label)} (단계: ${esc(k.stages.join(", "))})</option>`).join("")}</select>`;
+  const multi = ["guidance", "note", "question", "url", "query"].includes(p.name);
+  return label + (multi ? `<textarea id="${id}" rows="3" placeholder="${esc(example)}"></textarea>` : `<input id="${id}" placeholder="${esc(example)}">`);
+}
+
+function implPicker(stage) {
+  let impls = state.impls[stage] || [];
+  if (stage === "collector") impls = impls.filter((i) => taskOf(state.collectTask).collectors.includes(i.name));  // 업무에 맞는 수집 구현만
+  const id = `impl_${stage}`;
+  if (impls.length <= 1) return `<label>${STAGE_NAMES[stage]} 구현 <small>${esc(impls[0] ? impls[0].label : "")} (구현 1개)</small></label>`;
+  return `<label for="${id}">${STAGE_NAMES[stage]} 구현 <small>바꿔 끼울 수 있음</small></label><select id="${id}">` +
+    impls.map((i) => `<option value="${esc(i.name)}">${esc(i.label)}${i.axis !== "기본" ? ` · ${esc(i.axis)} 교체` : ""}</option>`).join("") + "</select>" +
+    `<p class="empty" id="${id}_desc" style="margin:4px 0 0">${esc(impls[0].description)}</p>`;
+}
+
+function openForm(key) {
+  const a = state.actions.find((x) => x.key === key);
+  const model = $("model").value.trim();
+  const usesModel = a.bedrock;
+  const draw = () => {
+    const collector = $("impl_collector") ? $("impl_collector").value : "";
+    $("fields").innerHTML = a.params.filter((p) => (!p.impl || p.impl === collector) && p.name !== "instance").map(field).join("");  // 업무는 폴더에서 정해진다
+    a.impl_stages.forEach((s) => {
+      const sel = $(`impl_${s}`); if (!sel) return;
+      $(`impl_${s}_desc`).textContent = (state.impls[s].find((i) => i.name === sel.value) || {}).description || "";
+    });
+  };
+  const [title, costText] = actionLabel(a);
+  $("dlgForm").innerHTML = `<h3 style="margin:0">${esc(title)}</h3><p class="empty">${esc(a.description)}</p>` +
+    (a.impl_stages.length ? `<fieldset><legend>구현 선택</legend>${a.impl_stages.map(implPicker).join("")}</fieldset>` : "") +
+    `<div id="fields"></div>` +
+    `<div class="cost">비용·시간: ${esc(costText)}${usesModel ? `<br>모델: ${esc(model || "기본값")}` : ""}<br>대기열에 올린 뒤 오른쪽 작업 목록에서 [실행]을 눌러야 시작된다.</div><div class="err" id="dlgErr"></div>` +
+    `<div style="display:flex;gap:6px;justify-content:flex-end"><button class="btn" value="cancel">닫기</button><button class="btn primary" id="dlgGo" value="go">실행 대기열에 올리기</button></div>`;
+  a.impl_stages.forEach((s) => { const sel = $(`impl_${s}`); if (sel) sel.onchange = draw; });
+  draw();
+  $("dlgGo").onclick = async (ev) => {
+    ev.preventDefault();
+    const params = {}, impl = {};
+    const collector = $("impl_collector") ? $("impl_collector").value : "";
+    for (const p of a.params) {
+      if (p.impl && p.impl !== collector) continue;
+      const el = $(`f_${p.name}`); if (!el) continue;
+      if (p.kind === "bool") { if (el.checked) params[p.name] = true; }
+      else if (p.kind === "int") { if (el.value.trim()) params[p.name] = el.value.trim(); }
+      else if (el.value.trim() || p.kind === "numbers" && p.required) params[p.name] = el.value;
+    }
+    a.impl_stages.forEach((s) => { const sel = $(`impl_${s}`); if (sel) impl[s] = sel.value; });
+    if (Object.keys(impl).length) params.impl = impl;
+    if (key === "collect.search") params.instance = state.collectTask;
+    if (usesModel && model) params.model = model;
+    try { await api("/api/jobs", { method: "POST", body: JSON.stringify({ action: key, item: state.item.id, params }) });
+          $("dlg").close(); showJobs(); refreshJobs(); }
+    catch (e) { $("dlgErr").textContent = e.message; }
+  };
+  $("dlg").showModal();
+}
+
+let pollTimer = null, openJob = null;
+async function refreshJobs() {
+  const jobs = await api("/api/jobs");
+  const active = jobs.some((j) => j.status === "running" || j.status === "pending");
+  const waiting = jobs.filter((j) => j.status === "pending" || j.status === "running").length;
+  $("badge").hidden = !waiting; $("badge").textContent = waiting;
+  if (waiting > (state.lastWaiting || 0) && ui.jobsFolded) { ui.jobsFolded = false; applyUi(); }  // 채팅이 새 작업을 올렸으면 목록을 편다
+  state.lastWaiting = waiting;
+  const detail = openJob ? await api(`/api/jobs/${openJob}`).catch(() => null) : null;
+  const choice = (j) => { const p = j.params || {}; const parts = [];
+    for (const [s, n] of Object.entries(p.impl || {})) parts.push(`${STAGE_NAMES[s] || s}=${n}`);
+    if (p.model) parts.push(`모델=${p.model}`); return parts.length ? `<div class="empty">구현·부품: ${esc(parts.join(", "))}</div>` : ""; };
+  const shown = (p) => JSON.stringify(Object.fromEntries(Object.entries(p || {}).filter(([k]) => k !== "impl" && k !== "model" && k !== "text")));
+  $("jobs").innerHTML = jobs.length ? jobs.slice(0, 8).map((j) => `<div class="job">
+      <div><span class="st ${j.status}">${statusName(j.status)}</span> · ${esc(j.label)} <span class="tag">${j.source === "chat" ? "채팅" : "버튼"}</span></div>
+      <div class="empty">${esc(j.item === "__collect__" ? "수집" : j.item)} · ${esc(shown(j.params))}</div>${choice(j)}
+      ${j.status === "pending" ? `<div class="cost">비용·시간: ${esc(j.cost)}</div><button class="btn small primary" data-go="${j.id}">실행</button> <button class="btn small" data-cancel="${j.id}">취소</button>` : ""}
+      ${j.status === "running" ? `<button class="btn small" data-cancel="${j.id}">중단</button>` : ""}
+      ${j.status !== "pending" ? `<button class="btn small" data-log="${j.id}">${openJob === j.id ? "출력 닫기" : "출력 보기"}</button>` : ""}
+      ${detail && detail.id === j.id ? `<pre>${esc(detail.log || "(출력 없음)")}</pre>${detail.error ? `<div class="err">${esc(detail.error)}</div>` : ""}` : ""}
+    </div>`).join("") : '<p class="empty">아직 없다.</p>';
+  document.querySelectorAll("[data-go]").forEach((el) => el.onclick = () => jobAction(el.dataset.go, "confirm"));
+  document.querySelectorAll("[data-cancel]").forEach((el) => el.onclick = () => jobAction(el.dataset.cancel, "cancel"));
+  document.querySelectorAll("[data-log]").forEach((el) => el.onclick = () => { openJob = openJob === el.dataset.log ? null : el.dataset.log; refreshJobs(); });
+  const wasActive = pollTimer !== null;
+  clearTimeout(pollTimer); pollTimer = active ? setTimeout(refreshJobs, 2000) : null;
+  if (wasActive && !active) {  // 작업이 끝나면 공고 목록(가져오기로 새 공고가 생겼을 수 있다)과 결과 문서를 새로 읽는다
+    state.items = await api("/api/items"); renderItems(); loadResults();
+  }
+}
+const statusName = (s) => ({ pending: "확인 대기", running: "실행 중", done: "완료", failed: "실패", cancelled: "취소" }[s] || s);
+
+async function jobAction(id, verb) {
+  try { await api(`/api/jobs/${id}/${verb}`, { method: "POST" }); if (verb === "confirm") openJob = id; }
+  catch (e) { alert(e.message); }
+  refreshJobs();
+}
+
+$("chatForm").onsubmit = async (ev) => {
+  ev.preventDefault();
+  const text = $("chatInput").value.trim(); if (!text) return;
+  if (!state.item) { alert("먼저 공고를 고른다."); return; }
+  addMsg("user", text); $("chatInput").value = "";
+  const wait = addMsg("bot", "…");
+  try { const r = await api("/api/chat", { method: "POST", body: JSON.stringify({ item: state.item.id, message: text }) });
+        wait.innerHTML = md(r.reply); }
+  catch (e) { wait.innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+  refreshJobs(); loadResults();
+};
+function addMsg(who, text) {
+  const el = document.createElement("div"); el.className = `msg ${who}`; el.textContent = text;
+  $("msgs").appendChild(el); $("msgs").scrollTop = 1e9; return el;
+}
+init();
+</script>
+</body>
+</html>

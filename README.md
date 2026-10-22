@@ -4,7 +4,7 @@
 
 공고를 읽고, 회사를 조사하고, 요구를 뽑고, 내 근거를 찾고, 문항별 소재를 정하고, 초안을 쓰고, 문장마다 근거를 대조한다. 이 흐름을 **업무와 실행 엔진에서 떼어 낸 뼈대**로 만들었다. 업무(자소서·제안서·포트폴리오)나 엔진(Strands·다른 프레임워크) 중 하나를 바꿔도 나머지는 그대로 돈다.
 
-지금 구현된 업무는 자소서 작성 도우미다. 공고 한 건을 처음부터 초안까지 실제로 돌려 썼고, 만들면서 잰 실험은 모두 [기록](docs/experiments/)해 두었다.
+업무는 둘이다. **자소서 작성 도우미**는 공고 한 건을 처음부터 초안까지 실제로 돌려 썼고, **제안서**는 같은 분석 단계가 업무 설정만 바꿔 제안요청서(RFP)의 요구사항을 뽑는다(그 뒤 단계는 아직 자소서 전용). 만들면서 잰 실험은 모두 [기록](docs/experiments/)해 두었다.
 
 > 개인 프로젝트(2026.09~). DevCraft 2026(AWS AgentCore 핸즈온) Build-up 기간에 시작했다.
 > 5분이면 이 문서 → [`core/stages.py`](src/modular_agentic/core/stages.py)(단계 인터페이스) → [`docs/experiments/`](docs/experiments/) 순으로 보면 된다.
@@ -17,15 +17,27 @@
 
 ## 세 가지 비종속
 
-- **기능 비종속.** 업무가 바뀌어도 파이프라인은 그대로다. `core/`는 업무를 모르고, 업무별 설정(근거 코퍼스, 제외 경로, 문항, 조사 주제)은 `instances/`에만 있다.
-  - 확인: 자소서로 공고 → 조사 → 분석 → 매핑 → 소재 계획 → 초안 → 문장 검증을 한 건 끝까지 돌렸다.
-  - 아직: **두 번째 업무(포트폴리오·제안서)는 돌려 보지 않았다.** 비종속은 설계이고 검증은 한 건이다.
+- **기능 비종속.** 업무가 바뀌어도 파이프라인은 그대로다. `core/`는 업무를 모르고, 업무마다 다른 말·규칙은 업무 설정([`instances/profile.py`](src/modular_agentic/instances/profile.py))에 있다.
+  - 확인: 자소서로 공고 → 조사 → 분석 → 매핑 → 소재 계획 → 초안 → 문장 검증을 한 건 끝까지 돌렸다. 제안서 업무는 같은 분석 구현이 설정만 바꿔 RFP 발췌에서 요구사항 73개를 뽑았다.
+  - 아직: 업무 설정으로 옮긴 것은 분석 단계뿐이다. 매핑·검증·작성의 업무 차이는 구현체 프롬프트 안에 있어 자소서 전용이다.
 - **기술 비종속.** 프레임워크가 바뀌어도 코어는 그대로다. 단계는 Protocol([`core/stages.py`](src/modular_agentic/core/stages.py))로 정의하고, 프레임워크는 `engines/strands/`에서만 쓴다. `pyproject.toml`의 기본 의존성은 비어 있다.
   - 확인: `core/`, `tools/`, `instances/`에 strands·boto3·langchain·anthropic import가 없다.
-  - 아직: 엔진 구현은 Strands 하나다. 다른 엔진은 붙여 보지 않았다.
+  - 확인: 분석 단계에 Strands 없이 Bedrock Converse API를 직접 부르는 구현을 붙여 같은 공고로 비교했다(요구 73개로 같음 — 같은 모델·같은 규칙이라 당연하고, 이는 Strands에 묶여 있지 않다는 근거다).
+  - 아직: 두 번째 엔진은 분석 단계 하나다. 도구를 쓰는 단계(매핑)는 Strands 하나다.
 - **환경 비종속.** 서버·PC·클라우드 어디서든 같은 코드가 돈다. 모델·검색·경로는 설정으로 뺐다(`MAS_MODEL_ID`, `MAS_VAULT_DIR`). 검색은 환경에 따라 MCP → 상시 서버 → CLI 중 하나를 자동으로 고른다. 외부 명령은 `shell=True`나 cmd.exe 없이 직접 부른다.
-  - 확인: Linux 서버와 Windows PC에서 실행했고, 단위 테스트 303개는 AWS·qmd 없이 통과한다.
+  - 확인: Linux 서버와 Windows PC에서 실행했고, 단위 테스트 345개는 AWS·qmd 없이 통과한다.
   - 아직: 모델은 AWS Bedrock만, 검색은 qmd만 구현했다.
+
+## 갈아 끼우는 네 축
+
+| 축 | 무엇이 바뀌나 | 지금 실제로 꽂힌 것 |
+|---|---|---|
+| 주제 (코드·화면: 업무) | 어떤 문서를 만드나(업무 설정 파일) | 자소서 / 제안서(수집·분석까지) |
+| 방법 (코드: 목적) | 같은 단계를 다른 방식으로 | 수집: 크롤러 결과 읽기 / 웹 검색 에이전트 / 붙여넣기 |
+| 엔진 | 같은 일을 다른 프레임워크로 | 분석: Strands / Bedrock 직접 호출 |
+| 도구 (코드: 부품) | 구현 안에서 쓰는 모델·검색 도구 | 모델(`MAS_MODEL_ID`), 검색 방식(MCP·상시 서버·CLI) |
+
+단계 구현은 구현체 목록([`registry.py`](src/modular_agentic/registry.py))에서 꺼내 쓴다. 스크립트·웹 콘솔이 고른 구현과 모델을 환경변수로 넘기고, 구현이 하나뿐인 단계도 목록에 올라 있다. 웹 콘솔(`scripts/run_console.py`)에서 업무별 폴더·단계별 실행·구현 선택·채팅 에이전트로 같은 일을 한다(비용이 드는 실행은 사람이 확인해야 시작된다).
 
 ## 어떻게 생겼나
 
@@ -37,11 +49,11 @@
                 승인         표시                          승인                        확인
 ```
 
-단계마다 인터페이스, 구현, 결과 폴더, 사람이 확인하는 자리가 하나씩 있다.
+단계마다 인터페이스, 구현, 결과 폴더, 사람이 확인하는 자리가 하나씩 있다. 묶어 보면 네 단계다: **수집·조사**(입력 확보) → **분석**(요구사항 도출) → **근거**(매핑·검증) → **작성**(소재 계획·초안·문장 검증). 소재 계획은 새 근거를 찾지 않고 찾은 근거를 문항에 나눠 담는 개요 작업이라 작성에 묶는다.
 
 | 단계 | 하는 일 | 결과 |
 |---|---|---|
-| 00 수집 | 공고(텍스트·이미지)와 회사 자료를 받는다. 긴 이미지는 조각내 전사한다 | `inputs/00_collect` |
+| 00 수집 | 공고 후보를 모으고(크롤러·웹 검색 에이전트·붙여넣기) 사람이 골라 가져온다. 긴 이미지는 조각내 전사한다 | `inputs/00_collect` |
 | 01 조사 | **출처 인용이 붙은** 조사 보고서를 만든다. 인용이 자료에 없으면 코드가 그 주장을 버린다 | `logs/01_research` |
 | 02 분석 | 공고에서 요구 목록을 뽑고, 사용자가 기본 요건을 표시한다 | `logs/02_analyze` |
 | 03 매핑·검증 | 요구마다 근거를 검색해 확인·부분확인·TODO로 판정하고, 정정·과장이 없는지 검증한다 | `logs/03_map` |
@@ -82,7 +94,7 @@ AWS AgentCore는 Runtime 안에서 Tailscale로 서버에 닿는 시험까지 �
 
 ```bash
 # Python 3.12+, uv
-uv run --extra strands --extra proxy --extra dev --extra sources pytest -q   # 303개, AWS·qmd 호출 없음
+uv run --extra strands --extra proxy --extra dev --extra sources pytest -q   # 345개, AWS·qmd 호출 없음
 ```
 
 공고 한 건을 처음부터 돌리려면 AWS Bedrock 자격증명과 qmd로 색인한 마크다운 지식 베이스가 필요하다. 순서와 명령은 [`docs/runbook-cover-letter.md`](docs/runbook-cover-letter.md)에 있다.
@@ -105,26 +117,31 @@ uv run --extra strands --extra proxy --extra dev --extra sources pytest -q   # 3
 | 위치 | 내용 |
 |---|---|
 | [`core/`](src/modular_agentic/core) | 타입, 단계 인터페이스, 사람이 확인하는 자리(조사 보고서·분석·소재 계획), 문장 검증과 인용 대조. **프레임워크를 모른다** |
-| [`engines/strands/`](src/modular_agentic/engines/strands) | Strands로 만든 단계 구현. 모델 호출은 여기에만 있다 |
-| [`instances/`](src/modular_agentic/instances) | 업무별 설정(지금은 자소서) |
+| [`engines/strands/`](src/modular_agentic/engines/strands) | Strands로 만든 단계 구현 |
+| [`engines/basic/`](src/modular_agentic/engines/basic) | 프레임워크 없는 구현(크롤러 결과 읽기, 붙여넣기, Bedrock 직접 호출 분석) |
+| [`registry.py`](src/modular_agentic/registry.py) | 단계별 구현체 목록과 고르는 스위치 |
+| [`instances/`](src/modular_agentic/instances) | 업무 설정(자소서, 제안서) |
 | [`tools/`](src/modular_agentic/tools) | 검색, 근거 읽기, 자료 수집 |
 | [`services/qmd_proxy/`](src/modular_agentic/services/qmd_proxy) | qmd 앞에서 인증·역할·도구 범위를 맡는 MCP 프록시 |
+| [`services/console/`](src/modular_agentic/services/console) | 웹 콘솔: 허용 목록의 단계 작업을 대기열로 실행, 결과 문서 보기, 채팅 에이전트 |
 | [`eval/`](src/modular_agentic/eval), [`scripts/`](scripts) | 평가 코드, 단계별 실행·실험 스크립트 |
-| [`tests/`](tests), [`deploy/`](deploy) | 단위 테스트 303개, AgentCore 시험용 배포 코드 |
+| [`tests/`](tests), [`deploy/`](deploy) | 단위 테스트 345개, AgentCore 시험용 배포 코드 |
 
 ## 한계와 할 일
 
 한계
-- 도메인 비종속은 자소서 한 건으로만 검증했다.
-- 엔진은 Strands, 모델은 Bedrock, 검색은 qmd 하나씩이다. 인터페이스로 나눴을 뿐 다른 구현을 붙여 본 것은 아니다.
+- 도메인 비종속은 자소서 한 건과 제안서 분석 한 건으로 확인했다. 제안서의 매핑·검증·작성은 파이프라인으로 돌리지 않았다.
+- 두 번째 구현이 있는 단계는 수집과 분석뿐이다. 모델은 Bedrock, 검색은 qmd 하나씩이다.
+- 모델이 댄 id·인용을 대조하는 코드가 Strands 구현 안에 흩어져 있어(공통은 인용 대조 하나), 엔진을 늘리려면 공통 모듈로 빼야 한다.
 - 자소서 업무는 개인 지식 베이스(마크다운)가 있어야 돈다. 그 내용은 개인 기록이라 공개하지 않아서, 전체 흐름을 그대로 재현할 수는 없고 테스트와 문서로 확인한다.
 - 실험은 대부분 공고 한 건과 한 사람의 지식 베이스에서 나왔다. 표본이 작아서 비율은 방향을 보는 용도다.
 
 할 일
-- 두 번째 업무(포트폴리오 생성)로 같은 단계가 재사용되는지 확인한다.
+- 제안서의 나머지 단계를 업무 설정으로 옮긴다(근거 출처: 제품 자료 PDF 검색, 검증 기준, 작성 형식).
 - 문장 검증을 안정시킨다. 같은 글을 여러 번 검사해 합치는 방법을 새 공고의 새 초안으로 평가한다.
 - 검색이 놓치는 소재를 위해 경험 목록(인벤토리)을 만든다.
-- Strands 말고 다른 엔진을 하나 붙여 본다.
+- 도구를 쓰는 단계(매핑)에 두 번째 엔진, 로컬 모델 엔진을 붙여 본다.
+- AgentCore(Runtime·Gateway·Memory)에 올리고, 같은 작업 목록을 MCP로 열어 Amazon Quick에서도 쓴다.
 
 ## 문서
 

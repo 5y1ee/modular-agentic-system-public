@@ -149,3 +149,16 @@ class LinkOut(BaseModel):
 class LinksOut(BaseModel):
     links: list[LinkOut] = Field(description="요구와 관련 있는 조사 주장의 연결들. 관련 있는 것이 없으면 빈 목록.")
 
+
+
+class PostingCandidateOut(BaseModel):
+    url: str = Field(description="공고 원문 페이지 주소. fetch_page로 실제로 읽은 주소를 글자 그대로 쓴다.")
+    company: str = Field(description="회사 이름")
+    role: str = Field(description="직무 이름")
+    deadline: str = Field(default="", description="페이지에 적힌 마감일. 없으면 빈 문자열(지어내지 않는다).")
+    quote: str = Field(description="이 페이지가 채용공고 원문임을 보여 주는 문장 하나를 페이지에서 글자 그대로 복사한다(예: 자격요건 한 줄).")
+    reason: str = Field(description="목표에 맞는 이유 한 줄")
+
+
+class PostingCandidatesOut(BaseModel):
+    candidates: list[PostingCandidateOut] = Field(description="찾은 공고 후보. 못 찾았으면 빈 목록.")

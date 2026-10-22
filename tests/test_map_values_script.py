@@ -17,7 +17,10 @@ Make It Yours — 일의 가치를 스스로 만들어 갑니다. 우리는 맡�
 
 Work With Grit — 집요하지만 빠르게 해결합니다. 문제의 본질을 끝까지 파고든다.
 
-설명만 있는 줄이거나 — 기호가 없는 줄은 건너뛴다
+줄표가 없는 설명 줄은 건너뛴다
+- 목록 줄 — 항목처럼 보여도 건너뛴다
+> 인용 줄 — 마찬가지로 건너뛴다
+이 줄은 이름이 너무 길어서 사실은 설명 문장인데 중간에 줄표가 들어 있는 경우라서 건너뛴다 — 이름으로 읽으면 안 된다
 """
 
 
@@ -27,6 +30,46 @@ def test_parse_values_reads_name_and_definition_lines_only():
         ("Work With Grit", "집요하지만 빠르게 해결합니다. 문제의 본질을 끝까지 파고든다."),
     ]
     assert map_values.parse_values("") == []
+
+
+def test_parse_values_reads_korean_and_numbered_names():
+    text = "Q1 높은 목표 — 스스로 정한 높은 목표를 수치로 증명한 경험\nSUPEX — 최고 수준을 지향한다\n목표 달성 (Q1) — 괄호가 든 이름도 읽는다\n"
+    assert map_values.parse_values(text) == [
+        ("Q1 높은 목표", "스스로 정한 높은 목표를 수치로 증명한 경험"),
+        ("SUPEX", "최고 수준을 지향한다"),
+        ("목표 달성 (Q1)", "괄호가 든 이름도 읽는다"),
+    ]
+
+
+def test_definition_with_its_own_dash_stays_whole():
+    assert map_values.parse_values("Name — 앞 — 뒤") == [("Name", "앞 — 뒤")]
+
+
+def test_topic_requirement_uses_name_and_definition_without_value_wording():
+    reqs = map_values.values_to_requirements("job_values", [("Q1 높은 목표", "수치로 증명한 경험")], map_values.TOPIC_KIND)
+    assert reqs[0].text == "'Q1 높은 목표' — 수치로 증명한 경험" and reqs[0].kind == "항목"
+    assert "Talent Value" not in reqs[0].text
+    assert map_values.value_name(reqs[0]) == "Q1 높은 목표" and map_values.value_definition(reqs[0]) == "수치로 증명한 경험"
+
+
+def test_value_name_reads_both_kinds_and_names_with_apostrophes():
+    value = map_values.values_to_requirements("job_values", [("Don't Stop", "멈추지 않는다")])[0]
+    assert map_values.value_name(value) == "Don't Stop"
+    topic = map_values.values_to_requirements("job_values", [("Don't Stop", "멈추지 않는다")], map_values.TOPIC_KIND)[0]
+    assert map_values.value_name(topic) == "Don't Stop"
+
+
+def test_render_uses_item_wording_for_topics_and_value_wording_for_values():
+    from modular_agentic.core.types import Mapping, MappingStatus, Verdict, VerdictKind
+
+    topic = map_values.values_to_requirements("t", [("Q2 시도", "시킨 범위를 넘어 실행한 경험")], map_values.TOPIC_KIND)
+    md = map_values.render_values_md([Mapping(topic[0], [], MappingStatus.TODO, "없음")], [Verdict(topic[0].id, VerdictKind.APPROVED)])
+    assert md.startswith("# 항목별 근거 후보") and "| 항목 | 상태 | 검증 |" in md and "**항목의 뜻**: 시킨 범위를 넘어 실행한 경험" in md
+    assert "공식 문구" not in md
+
+    value = map_values.values_to_requirements("v", [("Work With Grit", "집요하게 해결한다")])
+    md = map_values.render_values_md([Mapping(value[0], [], MappingStatus.TODO, "없음")], [Verdict(value[0].id, VerdictKind.APPROVED)])
+    assert md.startswith("# 회사 가치별 근거 후보") and "| 가치 | 상태 | 검증 |" in md and "**가치의 뜻(공식 문구)**: 집요하게 해결한다" in md
 
 
 def test_each_value_becomes_a_requirement_with_its_definition_for_search():

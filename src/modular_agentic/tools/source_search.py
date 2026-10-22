@@ -13,7 +13,7 @@
   검색 서비스가 주는 요약 문장(snippet)은 후보를 보여 주는 데만 쓰고 사실로 쓰지 않는다.
 
 비밀(API 키)
-  키는 환경변수 TAVILY_API_KEY 또는 파일 ~/.config/mas/tavily_key(권한 600)에서만 읽는다. 로그·오류 메시지·예외에 넣지 않는다.
+  키는 환경변수 TAVILY_API_KEY 또는 파일 ~/.config/key/tavily_key(권한 600)에서만 읽는다. 로그·오류 메시지·예외에 넣지 않는다.
   파일 권한이 넓으면(그룹·다른 사용자가 읽을 수 있으면) 쓰지 않고 거절한다(POSIX만 확인한다).
 
 확인하지 못한 것
@@ -36,7 +36,7 @@ from typing import Protocol
 
 TAVILY_SEARCH_URL = "https://api.tavily.com/search"
 TAVILY_KEY_ENV = "TAVILY_API_KEY"
-TAVILY_KEY_PATH = Path.home() / ".config" / "mas" / "tavily_key"
+TAVILY_KEY_PATH = Path.home() / ".config" / "key" / "tavily_key"
 SEARCH_TIMEOUT_SECONDS = 20
 
 DEFAULT_PER_QUERY = 3

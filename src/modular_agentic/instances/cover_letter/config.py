@@ -53,3 +53,18 @@ RESEARCH_QUERIES: tuple[tuple[str, str, bool], ...] = (
     ("산업 이슈", "{company} 산업 동향 시장 전망", True),
     ("조직·문화", "{company} 조직문화 인재상 복리후생", False),
 )
+
+# 업무 설정(instances/profile.py). 분석 프롬프트가 이 값으로 만들어진다. 2026-10-21 이전의 분석 프롬프트와 글자까지 같게 채웠다
+# (기존 결과·실험 기록과 같은 프롬프트, tests/test_profiles.py가 확인).
+from modular_agentic.instances.profile import Profile  # noqa: E402  (위 설정과 따로 읽히게 아래에 둔다)
+
+PROFILE = Profile(
+    name="cover_letter",
+    label="자소서",
+    item_label="채용공고",
+    analyzer_role="채용공고 본문에서 지원자에게 요구되는 항목을 하나씩 뽑는 역할",
+    analyzer_scope="지원자의 경험·역량·기술로 대답할 수 있는 항목만 뽑는다. 근무지, 급여, 복지, 전형 절차, 마감일은 제외한다.",
+    analyzer_kind="kind에는 공고가 붙인 분류(자격요건, 우대사항, 담당업무 등)를 쓴다. 분류가 없으면 빈 문자열이다.",
+    stages=("collect", "research", "analyze", "map", "plan", "write"),
+    collectors=("inthiswork", "web_agent", "paste"),
+)

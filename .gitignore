@@ -15,3 +15,4 @@ proxy.*.json
 deploy/tailscale_probe/build/
 deploy/tailscale_probe/deployment_package.zip
 deploy/tailscale_probe/.probe-state.json
+scripts/deck/node_modules/

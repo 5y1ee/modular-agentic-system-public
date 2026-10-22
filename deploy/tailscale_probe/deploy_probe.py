@@ -2,7 +2,7 @@
 
 사용 (프로필은 AWS_PROFILE, 리전 기본 us-west-2)
   uv run --extra strands python deploy/tailscale_probe/deploy_probe.py plan      # AWS를 부르지 않고 만들 것만 보여 준다
-  uv run --extra strands python deploy/tailscale_probe/deploy_probe.py deploy --authkey-file ~/.config/mas/ts_authkey --target 100.64.0.1:8282
+  uv run --extra strands python deploy/tailscale_probe/deploy_probe.py deploy --authkey-file ~/.config/key/ts_authkey --target 100.64.0.1:8282
   uv run --extra strands python deploy/tailscale_probe/deploy_probe.py invoke    # 단계별 결과(JSON)를 출력
   uv run --extra strands python deploy/tailscale_probe/deploy_probe.py cleanup   # 만든 것을 모두 지운다(Runtime, S3 파일·버킷, 역할)
 
